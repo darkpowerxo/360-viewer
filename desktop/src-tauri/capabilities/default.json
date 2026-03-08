@@ -1,0 +1,32 @@
+{
+  "identifier": "default",
+  "description": "Default capabilities for the Insta360 Viewer desktop app",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "opener:default",
+    "dialog:allow-open",
+    "store:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "args": true,
+          "name": "binaries/node",
+          "sidecar": true
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "args": true,
+          "name": "binaries/node",
+          "sidecar": true
+        }
+      ]
+    },
+    "shell:allow-kill"
+  ]
+}

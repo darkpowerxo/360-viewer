@@ -1,0 +1,214 @@
+<div id="viewer-container">
+  <% if (stitchStatus === 'converting') { %>
+    <div id="stitch-progress">
+      <div class="progress-text">Converting to equirectangular...</div>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width: <%= progress %>%"></div>
+      </div>
+      <div class="progress-pct"><%= progress %>%</div>
+    </div>
+  <% } %>
+</div>
+
+<!-- Viewer overlay controls -->
+<div id="viewer-overlay">
+  <!-- Top bar: back + title + counter -->
+  <div id="viewer-top-bar">
+    <a id="viewer-back" href="/browse/<%= parentPath ? parentPath + '/' : '' %>" title="Back to folder">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </a>
+    <span id="viewer-title"><%= fileName %></span>
+    <span id="viewer-counter"></span>
+  </div>
+
+  <!-- Prev / Next navigation -->
+  <button id="viewer-prev" class="viewer-nav-btn viewer-nav-prev" style="display:none" title="Previous">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+  </button>
+  <button id="viewer-next" class="viewer-nav-btn viewer-nav-next" style="display:none" title="Next">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+  </button>
+
+  <% if (fileType === 'video') { %>
+  <!-- Bottom bar: video controls -->
+  <div id="viewer-bottom-bar">
+    <button id="play-pause-btn" class="viewer-icon-btn" title="Play">
+      <svg id="icon-play" width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      <svg id="icon-pause" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+    </button>
+    <span id="time-current" class="viewer-time">0:00</span>
+    <div id="seek-track">
+      <div id="seek-fill"></div>
+      <div id="seek-thumb"></div>
+    </div>
+    <span id="time-duration" class="viewer-time">0:00</span>
+  </div>
+  <% } %>
+</div>
+
+<% if (fileType === 'video') { %>
+  <video id="video-source" crossorigin="anonymous" playsinline style="display:none"></video>
+<% } %>
+
+<button id="enter-vr-viewer" class="vr-btn" style="display:none">Enter VR</button>
+
+<script type="module">
+  import * as THREE from 'three';
+  window.THREE = THREE;
+
+  const MEDIA_URL = '/media/<%= filePath %>';
+  const FILE_TYPE = '<%= fileType %>';
+  const STITCH_STATUS = '<%= stitchStatus %>';
+  const STITCH_STATUS_URL = '/api/stitch-status/<%= filePath %>';
+  const FILE_PATH = '<%= filePath %>';
+
+  // Load siblings for prev/next
+  async function loadSiblings() {
+    try {
+      const resp = await fetch('/api/siblings/' + FILE_PATH);
+      const data = await resp.json();
+      const counter = document.getElementById('viewer-counter');
+      if (counter && data.total > 1) {
+        counter.textContent = data.current + ' / ' + data.total;
+      }
+      const prevBtn = document.getElementById('viewer-prev');
+      const nextBtn = document.getElementById('viewer-next');
+      if (data.prev && prevBtn) {
+        prevBtn.style.display = '';
+        prevBtn.onclick = () => { window.location.href = data.prev.viewUrl; };
+      }
+      if (data.next && nextBtn) {
+        nextBtn.style.display = '';
+        nextBtn.onclick = () => { window.location.href = data.next.viewUrl; };
+      }
+    } catch (e) {
+      console.error('Failed to load siblings:', e);
+    }
+  }
+  loadSiblings();
+
+  // Keyboard navigation
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') {
+      const btn = document.getElementById('viewer-prev');
+      if (btn && btn.style.display !== 'none') btn.click();
+    } else if (e.key === 'ArrowRight') {
+      const btn = document.getElementById('viewer-next');
+      if (btn && btn.style.display !== 'none') btn.click();
+    } else if (e.key === 'Escape') {
+      document.getElementById('viewer-back').click();
+    }
+  });
+
+  // Video controls
+  if (FILE_TYPE === 'video') {
+    const video = document.getElementById('video-source');
+    const playBtn = document.getElementById('play-pause-btn');
+    const iconPlay = document.getElementById('icon-play');
+    const iconPause = document.getElementById('icon-pause');
+    const seekTrack = document.getElementById('seek-track');
+    const seekFill = document.getElementById('seek-fill');
+    const seekThumb = document.getElementById('seek-thumb');
+    const timeCur = document.getElementById('time-current');
+    const timeDur = document.getElementById('time-duration');
+
+    function formatTime(s) {
+      if (!s || isNaN(s)) return '0:00';
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
+      return m + ':' + (sec < 10 ? '0' : '') + sec;
+    }
+
+    playBtn.addEventListener('click', () => {
+      if (video.paused) {
+        video.play();
+      } else {
+        video.pause();
+      }
+    });
+
+    video.addEventListener('play', () => {
+      iconPlay.style.display = 'none';
+      iconPause.style.display = '';
+    });
+    video.addEventListener('pause', () => {
+      iconPlay.style.display = '';
+      iconPause.style.display = 'none';
+    });
+
+    video.addEventListener('timeupdate', () => {
+      if (video.duration) {
+        const pct = (video.currentTime / video.duration) * 100;
+        seekFill.style.width = pct + '%';
+        seekThumb.style.left = pct + '%';
+      }
+      timeCur.textContent = formatTime(video.currentTime);
+    });
+
+    video.addEventListener('loadedmetadata', () => {
+      timeDur.textContent = formatTime(video.duration);
+    });
+
+    // Seek on click/drag
+    let seeking = false;
+    function seekTo(e) {
+      const rect = seekTrack.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      video.currentTime = pct * video.duration;
+    }
+    seekTrack.addEventListener('mousedown', (e) => { seeking = true; seekTo(e); });
+    document.addEventListener('mousemove', (e) => { if (seeking) seekTo(e); });
+    document.addEventListener('mouseup', () => { seeking = false; });
+    seekTrack.addEventListener('touchstart', (e) => { seeking = true; seekTo(e.touches[0]); });
+    document.addEventListener('touchmove', (e) => { if (seeking) seekTo(e.touches[0]); });
+    document.addEventListener('touchend', () => { seeking = false; });
+  }
+
+  // Auto-hide overlay
+  let overlayTimer;
+  const overlay = document.getElementById('viewer-overlay');
+  function showOverlay() {
+    overlay.classList.remove('hidden');
+    clearTimeout(overlayTimer);
+    if (FILE_TYPE === 'video') {
+      overlayTimer = setTimeout(() => overlay.classList.add('hidden'), 4000);
+    }
+  }
+  document.getElementById('viewer-container').addEventListener('mousemove', showOverlay);
+  document.getElementById('viewer-container').addEventListener('click', showOverlay);
+  showOverlay();
+
+  // Load viewer
+  const viewerScript = document.createElement('script');
+  viewerScript.src = '/js/viewer360.js';
+  viewerScript.onload = () => {
+    if (STITCH_STATUS === 'ready') {
+      window.initViewer(MEDIA_URL, FILE_TYPE);
+    } else if (STITCH_STATUS === 'converting') {
+      pollStitchStatus();
+    }
+  };
+  document.body.appendChild(viewerScript);
+
+  function pollStitchStatus() {
+    const interval = setInterval(async () => {
+      try {
+        const resp = await fetch(STITCH_STATUS_URL);
+        const data = await resp.json();
+        const fill = document.querySelector('.progress-fill');
+        const pct = document.querySelector('.progress-pct');
+        if (fill) fill.style.width = data.progress + '%';
+        if (pct) pct.textContent = data.progress + '%';
+        if (data.status === 'ready') {
+          clearInterval(interval);
+          const el = document.getElementById('stitch-progress');
+          if (el) el.remove();
+          window.initViewer(MEDIA_URL, FILE_TYPE);
+        }
+      } catch (e) {
+        console.error('Poll error:', e);
+      }
+    }, 2000);
+  }
+</script>
+<script src="/js/vrMode.js" type="module" defer></script>

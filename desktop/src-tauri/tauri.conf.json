@@ -1,0 +1,34 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-cli/schema.json",
+  "productName": "360 Viewer",
+  "version": "1.0.0",
+  "identifier": "com.insta360viewer.app",
+  "build": {
+    "frontendDist": "../dist",
+    "beforeDevCommand": "node scripts/build-frontend.js",
+    "beforeBuildCommand": "node scripts/build-frontend.js --minify && node scripts/bundle-app.js"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "360 Viewer",
+        "width": 520,
+        "height": 480,
+        "resizable": false,
+        "center": true
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": ["binaries/node"],
+    "resources": ["resources/app/**/*"]
+  }
+}

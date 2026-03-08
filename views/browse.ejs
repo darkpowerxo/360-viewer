@@ -1,0 +1,56 @@
+<nav class="breadcrumbs">
+  <% breadcrumbs.forEach((crumb, i) => { %>
+    <% if (i > 0) { %><span class="sep">/</span><% } %>
+    <% if (i < breadcrumbs.length - 1) { %>
+      <a href="/browse/<%= crumb.path ? crumb.path + '/' : '' %>"><%= crumb.name %></a>
+    <% } else { %>
+      <span class="current"><%= crumb.name %></span>
+    <% } %>
+  <% }); %>
+</nav>
+
+<% if (items.length === 0) { %>
+  <p class="empty">No media files found in this folder.</p>
+<% } else { %>
+  <div class="grid">
+    <% items.forEach(item => { %>
+      <a href="<%= item.browseUrl %>" class="card">
+        <div class="card-thumb">
+          <% if (item.type === 'folder') { %>
+            <div class="folder-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+            </div>
+          <% } else { %>
+            <img src="<%= item.thumbUrl %>" alt="<%= item.name %>" loading="lazy">
+            <% if (item.mediaType === 'video') { %>
+              <div class="play-badge">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              </div>
+            <% } %>
+          <% } %>
+        </div>
+        <div class="card-label"><%= item.name %></div>
+      </a>
+    <% }); %>
+  </div>
+<% } %>
+
+<% if (totalPages > 1) { %>
+  <nav class="pagination">
+    <% if (page > 1) { %>
+      <a href="?page=<%= page - 1 %>" class="page-btn">Previous</a>
+    <% } %>
+    <span class="page-info">Page <%= page %> of <%= totalPages %></span>
+    <% if (page < totalPages) { %>
+      <a href="?page=<%= page + 1 %>" class="page-btn">Next</a>
+    <% } %>
+  </nav>
+<% } %>
+
+<script>
+  window.__BROWSE_DATA__ = {
+    currentPath: <%- JSON.stringify(currentPath) %>,
+    page: <%= page %>,
+    totalPages: <%= totalPages %>,
+  };
+</script>
